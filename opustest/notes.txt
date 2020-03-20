@@ -1,0 +1,45 @@
+Compile opus with emscripten:
+
+untar opus-1.3.1
+emconfigure ./configure --disable-asm  --disable-intrinsics --disable-doc  --disable-extra-programs  --disable-stack-protector  CFLAGS=-O2
+make
+emcc -L .libs -lopus -o opus.js -s "EXPORTED_FUNCTIONS=['_opus_encode','_opus_decode']" -s "EXTRA_EXPORTED_RUNTIME_METHODS=['cwrap']"
+
+-use opus.js, opus.wasm, opus.wast.mappedGlobals
+
+----------------------------------------------------------------
+For opus:
+
+
+
+//sample rate must be 8k, 12k, 16k, 24k or 48k
+//ok to always choose 48k and let opus handle compression
+int err;
+OpusEncoder* enc = opus_encoder_create( sampleRate, numChannels, OPUS_APPLICATION_VOIP, &err);
+opus_encoder_ctl( enc, OPUS_SET_BITRATE( bitsPerSecond ) );
+
+//to encode frame
+//numSamples: Number of floats in array (note: if stereo, 
+//  array has 2*numSamples floats)
+// Restriction: numSamples must be one Opus frame.
+//  An Opus frame is 2.5, 5, 10, 20, 40, or 60 msec of audio
+//  ex: At 48kHz sample rate, this must be one of 120,240,480,960,1920,2880
+//  ex: At 48kHz sample rate, 10msec = 480 samples
+//  Note: At 10msec or less, some compression techniques are not available.
+int numBytes = opus_encode_float( 
+    enc, pcmDataAsFloatArray, numSamples, outputBuffer, sizeOfOutputBuffer );
+Note: If numBytes <= 2, OK to just drop the packet
+
+
+opus_encoder_destroy(enc)
+
+
+
+////////////////
+int err;
+OpusDecoder* dec = opus_decoder_create( sampleRate, numChannels, &err );
+
+//decode frame:
+//frameSize should be at least 120msec = 5760 if 48KHz
+//Size of output data: numChannels * frameSize floats
+opus_decode_float( dec, dataBuffer, sizeOfDataBuffer, floatArrayOutput, frameSize, useForwardErrorCorrection )

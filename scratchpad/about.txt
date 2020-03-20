@@ -1,0 +1,2 @@
+This folder contains scratchpad and proof-of-concept work.
+The code is messy and not production ready at all.

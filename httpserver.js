@@ -21,27 +21,45 @@ let fs = require("fs");
 let path = require("path");
 
 const port=2020;
-const serverRoot = path.resolve(__dirname);
+const serverRoot = path.resolve(process.cwd()); //__dirname
 const mimeTypes = {
     "txt": "text/plain",
     "html": "text/html",
     "png": "image/png",
     "jpeg": "image/jpeg",
     "jpg": "image/jpeg",
-    "js": "application/javascript"
+    "js": "application/javascript",
+    "wasm": "application/wasm"
 };
 
 function main(){
     let srv = http.createServer();
     srv.on("request", handleRequest);
+    console.log(`Server root = ${serverRoot}`);
     console.log(`Listening on port ${port}`);
-    srv.listen(port);
+    srv.listen(port,"127.0.0.1");
 }
 
 function handleRequest(req,resp){
     let url = new URL( req.url, "http://"+req.headers.host);
-    let p = url.pathname;
     
+    if( req.method === "GET" )
+        handleGet(url,req,resp);
+    else if( req.method === "POST" )
+        handlePost(url,req,resp);
+    else
+        error(500,resp,url.pathname,"Bad method");
+}
+     
+function handlePost(url,req,resp){
+    log("POSTed data");
+    let fp = fs.createWriteStream("uploaded");
+    req.pipe(fp);
+}
+
+function handleGet(url,req,resp){
+    let p = url.pathname;
+        
     if( p === "/:file:" ){
         serveSVG(resp,"file svg", file_svg);
         return;
@@ -53,11 +71,11 @@ function handleRequest(req,resp){
     
     if( !p.startsWith("/") )
         p="/"+p;
-    p = __dirname+p;
+    p = serverRoot+p;
     p = path.resolve(p);
     
     if( !p.startsWith(serverRoot) ){
-        error(403,resp,p,"Forbidden");
+        error(403,resp,url.pathname,p,"Forbidden");
         return;
     }
     if( !fs.existsSync(p) ){
@@ -93,10 +111,13 @@ function log(){
     console.log(L.join(" "));
 }
 
-function error(code,resp,p,err){
+function error(code,resp){
     resp.writeHead(code,{"Content-type":"text/html"});
     resp.end();
-    log(p,err);
+    let tmp = [];
+    for(let i=2;i<arguments.length;++i)
+        tmp.push( ""+arguments[i]);
+    log(tmp.join(" "));
     return;
 }
 function serveDirectory( resp, p ){

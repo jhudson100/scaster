@@ -1,0 +1,17 @@
+{
+    "compilerOptions": {
+        "target":"ES6",
+        "module": "CommonJS",
+        "sourceMap": true,
+        "outDir": "bin",
+        "downlevelIteration": true,
+        "strict": true,
+        "noFallthroughCasesInSwitch": true,
+        
+        
+    },
+    "include": [
+        "src/**/*"
+    ]
+}
+

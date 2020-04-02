@@ -24,19 +24,67 @@ function makeBuffer(){
     return tmp;
 }
 
+let myHEAP;
 
+function readUint32(ptr){
+    let tmp = new Uint32Array( myHEAP.buffer, ptr );
+    return tmp[0];
+}
+
+
+function writeUint32(ptr,value){
+    let tmp = new Uint32Array( myHEAP.buffer, ptr );
+    return tmp[0]=value;
+}
 function main(){
     let tmp = makeBuffer();
-
     const OPUS_APPLICATION_VOIP = 2048;
     const OPUS_SET_BITRATE_REQUEST = 4002;
+    const OPUS_GET_BITRATE_REQUEST = 4003;
     let opus_encoder_create = Module.cwrap("opus_encoder_create", "number", [ "number","number","number", "number"])
-    let errPtr= Module._malloc( 4 );
-    let enc = opus_encoder_create( sampleRate, numChannels, OPUS_APPLICATION_VOIP, errPtr );
-    Module._free(errPtr);
-    console.log("enc=",enc);
-    opus_encoder_ctl( enc, OPUS_SET_BITRATE_REQUEST, 12000);
+    let opus_encoder_ctl = Module.cwrap("opus_encoder_ctl", "number", ["number","number","number"]);
+    let opus_encode_float = Module.cwrap("opus_encode_float", "number", ["number", "array", "number", "array", "number"] );
     
+    myHEAP = new Uint8Array( Module.HEAPU8.buffer );
+    
+    let rv;
+    
+    //vararg functions don't work in emscripten. Unfortunately, opus_encoder_ctl is a vararg function.
+     
+    let intPtr = Module._malloc( 4 );
+    console.log("intPtr=",intPtr);
+    let enc = opus_encoder_create( sampleRate, numChannels, OPUS_APPLICATION_VOIP, intPtr );
+    console.log("enc=",enc,"err=",readUint32(intPtr));
+    rv = opus_encoder_ctl( enc, OPUS_SET_BITRATE_REQUEST, 4000);
+    console.log("set bitrate:",rv);
+    rv = opus_encoder_ctl( enc, OPUS_GET_BITRATE_REQUEST, intPtr );
+    let theBitRate = readUint32( intPtr );
+    console.log("get bitrate: rv=",rv,"bitrate=",theBitRate);
+    
+    
+    rv = opus_encoder_ctl( enc, 4001, intPtr );
+    console.log("get app: rv=",rv,"app=",readUint32(intPtr) );
+
+
+
+    let msec = 60;
+    let numsamps = Math.floor(msec/1000*sampleRate);
+    console.log("numsamps=",numsamps);
+    let encoded = new Uint8Array(100000);    //FIXME: get better size
+    let totalEncoded=0;
+    let inFloats = new Float32Array(numsamps);
+    let inU8 = new Uint8Array(inFloats.buffer,0);
+    for(let i=0;i<tmp.length;i+=numsamps){
+        for(let j=0;j<numsamps;++j)
+            inFloats[j] = tmp[i+j];
+        let p = new Uint8Array( encoded, totalEncoded );
+        let numBytes = opus_encode_float( enc, inU8, numsamps, p, p.length );
+        console.log(numBytes);
+        totalEncoded += numBytes
+    }
+    console.log("Total bytes:",totalEncoded,"=",totalEncoded/seconds,"bytes/sec");
+    Module._free(intPtr);
+
 }
 /*
     let enc = opus_encoder_create( sampleRate, 1, OPUS_APPLICATION_VOIP, 
